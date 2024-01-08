@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <title>afk</title>
+</head>
+<body>
+ 
+<!-- Add the audio element for the sound -->
+    <audio id="statusSound">
+        <!-- Replace 'your-sound.mp3' with the actual file name and path -->
+        <source src="sources/message.mp3" type="audio/mp3">
+        Your browser does not support the audio tag.
+    </audio> 
+
+<div class="video-container">
+        <video width="150" height="150" autoplay loop muted>
+            <!-- Replace 'your-video.mp4' with the actual file name and path -->
+            <source src="sources/001.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+
+    </div>   
+
+ <div class="animation-container">
+        <p id="status" class="fade-in-text">
+            <span id="timestamp" class="timestamp-text"></span>
+            You are now away: AFK<span class="blinking-cursor"> ></span>
+        </p>
+    </div>
+
+<script>
+    // JavaScript to display the timestamp
+    document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
+
+    function getCurrentTime() {
+        const now = new Date();
+        const hours = now.getHours().toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const seconds = now.getSeconds().toString().padStart(2, '0');
+        return `${hours}:${minutes}:${seconds}`;
+    }
+
+        // Function to play the status sound
+        function playStatusSound() {
+            var sound = document.getElementById('statusSound');
+		sound.volume = 0.8; // Adjust the volume (0.5 is 50%, adjust as needed)
+            sound.play();
+        }    
+
+
+
+// Flag to track whether a status has been added
+    let statusAdded = false;
+
+    // Flag to track whether the key event listener is enabled
+    let keyListenerEnabled = true;
+
+    // Timeout IDs for reverting to the original status and delaying the fade-out
+    let revertTimeout;
+    let fadeOutDelayTimeout;
+
+    // Function to add a new status with timestamp color
+    function addStatus(message, timestampColor, styles, isRevert = false) {
+        // Clear the timeouts to prevent conflicts
+        clearTimeout(revertTimeout);
+        clearTimeout(fadeOutDelayTimeout);
+
+        const animationContainer = document.querySelector('.animation-container');
+
+       // Check if there is an existing status
+const existingStatus = animationContainer.querySelector('.fade-in-text');
+if (existingStatus) {
+    // Add the class for delayed fade-out
+    existingStatus.classList.add('delayed-fade-out');
+
+    // Remove the element after the animation ends
+    existingStatus.addEventListener('animationend', function () {
+        animationContainer.removeChild(existingStatus);
+    });
+}
+
+        const newStatus = document.createElement('p');
+        newStatus.className = 'fade-in-text';
+
+        // Add timestamp with color
+        newStatus.innerHTML = `<span class="timestamp-text" style="color: ${timestampColor};">[${getCurrentTime()}]</span> ${message}`;
+
+        // Add additional styles if provided
+        if (styles && styles.length > 0) {
+            styles.forEach(style => newStatus.classList.add(style));
+        }
+
+        // Determine where to insert the new status based on whether it's a revert
+        if (isRevert) {
+            // For revert, insert it at the beginning (on top)
+            animationContainer.insertBefore(newStatus, animationContainer.firstChild);
+        } else {
+            // For keypress, insert it at the beginning if a status hasn't been added yet
+            if (!statusAdded) {
+                animationContainer.insertBefore(newStatus, animationContainer.firstChild);
+                statusAdded = true; // Set the flag to true to indicate that a status has been added
+            }
+        }
+
+	// Play the status sound
+            playStatusSound();
+    }
+
+    // Event listener for keydown event
+    document.addEventListener('keydown', function (event) {
+        // Check if the key event listener is enabled
+        if (!keyListenerEnabled) {
+            return;
+        }
+
+        // Example: Display a status with the pressed key, timestamp color, and multiple styles
+        addStatus(` You are no longer away.`, '#9b8f88', ['custom-style', 'another-style']);
+
+        // Disable the key event listener
+        keyListenerEnabled = false;
+
+        // Set a timeout to revert to the original status after 10 seconds
+        revertTimeout = setTimeout(() => {
+            addStatus('You are now away: AFK<span class="blinking-cursor"> ></span>', '#9b8f88', [], true);
+            statusAdded = false; // Reset the flag
+            // Re-enable the key event listener after the timeout
+            keyListenerEnabled = true;
+        }, 10000); // 10 seconds
+    });
+
+    // Initial timestamp
+    document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
+</script>
+
+</body>
+</html>
