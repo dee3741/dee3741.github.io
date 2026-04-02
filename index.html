@@ -110,17 +110,28 @@ const font = opentype.parse(bytes.buffer);
 
     let targetX = 0, targetY = 0, currentX = 0, currentY = 0;
 
+    // Shared state for hand tracking
+    window.handState = { pinching: false, targetRotX: 0, targetRotY: 0, currentRotX: 0, currentRotY: 0 };
+
     document.addEventListener('mousemove', (e) => {
-        targetY = ((e.clientX / window.innerWidth) * 2 - 1) * 0.1;
-        targetX = -((e.clientY / window.innerHeight) * 2 - 1) * 0.1;
+        if (!window.handState.pinching) {
+            targetY = ((e.clientX / window.innerWidth) * 2 - 1) * 0.1;
+            targetX = -((e.clientY / window.innerHeight) * 2 - 1) * 0.1;
+        }
     });
 
     (function animate() {
         requestAnimationFrame(animate);
+        if (window.handState.pinching) {
+            targetX = window.handState.targetRotX;
+            targetY = window.handState.targetRotY;
+        }
         currentX += (targetX - currentX) * 0.06;
         currentY += (targetY - currentY) * 0.06;
         mesh.rotation.x = currentX;
         mesh.rotation.y = currentY;
+        window.handState.currentRotX = currentX;
+        window.handState.currentRotY = currentY;
         renderer.render(scene, camera);
     })();
 }
@@ -235,6 +246,115 @@ if (existingStatus) {
 
     // Initial timestamp
     document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
+</script>
+
+<!-- Hand tracking indicator -->
+<div id="hand-indicator" style="
+    position: fixed; bottom: 50px; right: 50px;
+    font-family: 'Arial Narrow', sans-serif;
+    font-size: 14px; color: #9b8f88;
+    background: rgba(255,255,255,0.05);
+    padding: 8px 14px; border-radius: 4px;
+    display: flex; align-items: center; gap: 8px;
+    opacity: 0; transition: opacity 0.4s;
+">
+    <span id="hand-dot" style="width:8px;height:8px;border-radius:50%;background:#9b8f88;display:inline-block;transition:background 0.2s;"></span>
+    <span id="hand-label">camera off</span>
+</div>
+
+<!-- Hidden video for webcam -->
+<video id="hand-video" style="display:none;" playsinline></video>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+(function() {
+    const indicator  = document.getElementById('hand-indicator');
+    const dot        = document.getElementById('hand-dot');
+    const label      = document.getElementById('hand-label');
+    const videoEl    = document.getElementById('hand-video');
+
+    function setStatus(state) {
+        indicator.style.opacity = '1';
+        if (state === 'off')      { dot.style.background = '#9b8f88'; label.textContent = 'camera off'; }
+        if (state === 'ready')    { dot.style.background = '#9b8f88'; label.textContent = 'no hand'; }
+        if (state === 'detected') { dot.style.background = '#deea4c'; label.textContent = 'hand detected'; }
+        if (state === 'pinching') { dot.style.background = '#8A3F44'; label.textContent = 'pinching'; }
+    }
+
+    // Pinch tracking state
+    let wasPinching   = false;
+    let pinchStartX   = 0, pinchStartY   = 0;
+    let baseRotX      = 0, baseRotY      = 0;
+
+    function getPinchMidpoint(lm) {
+        return { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 };
+    }
+
+    function onResults(results) {
+        if (!window.handState) return;
+
+        const lms = results.multiHandLandmarks;
+        if (!lms || lms.length === 0) {
+            window.handState.pinching = false;
+            wasPinching = false;
+            setStatus('ready');
+            return;
+        }
+
+        const lm = lms[0];
+        setStatus('detected');
+
+        // Pinch: distance between thumb tip (4) and index tip (8)
+        const dx = lm[4].x - lm[8].x;
+        const dy = lm[4].y - lm[8].y;
+        const pinchDist = Math.sqrt(dx * dx + dy * dy);
+        const pinching  = pinchDist < 0.06;
+
+        if (pinching) {
+            setStatus('pinching');
+            const mid = getPinchMidpoint(lm);
+            if (!wasPinching) {
+                // Pinch just started — capture base rotation and start position
+                pinchStartX = mid.x;
+                pinchStartY = mid.y;
+                baseRotX    = window.handState.currentRotX;
+                baseRotY    = window.handState.currentRotY;
+                wasPinching = true;
+            }
+            // Webcam is mirrored so invert X delta
+            const sensitivity = 4;
+            window.handState.targetRotX = baseRotX - (mid.y - pinchStartY) * sensitivity;
+            window.handState.targetRotY = baseRotY - (mid.x - pinchStartX) * sensitivity;
+            window.handState.pinching   = true;
+        } else {
+            if (wasPinching) wasPinching = false;
+            window.handState.pinching = false;
+        }
+    }
+
+    // Wait for MediaPipe to load then init
+    function init() {
+        if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
+            setTimeout(init, 200);
+            return;
+        }
+
+        const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+
+        const cam = new Camera(videoEl, {
+            onFrame: async () => { await hands.send({ image: videoEl }); },
+            width: 320, height: 240
+        });
+
+        cam.start().then(() => setStatus('ready')).catch(() => setStatus('off'));
+    }
+
+    init();
+})();
 </script>
 
 </body>
