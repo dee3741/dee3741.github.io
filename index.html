@@ -13,7 +13,7 @@
 <!-- Add the audio element for the sound -->
     <audio id="statusSound">
         <!-- Replace 'your-sound.mp3' with the actual file name and path -->
-        <source src="sources/message.mp3" type="image/mp3">
+        <source src="sources/message.mp3" type="audio/mp3">
         Your browser does not support the audio tag.
     </audio>
 
@@ -29,7 +29,7 @@
         </p>
     </div>
 
-    <form class="message-compose" id="messageForm" autocomplete="off">
+    <form class="message-compose" id="messageForm" autocomplete="ofb">
         <input id="messageInput" class="message-input" type="text" name="message" maxlength="140" placeholder="Type a message..." aria-label="Type a message">
         <button class="message-send" type="submit">send</button>
     </form>
