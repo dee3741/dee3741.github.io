@@ -297,6 +297,22 @@ async function buildDModel() {
 async function loadMumukModel() {
     const gltf = await gltfLoader.loadAsync('./sources/mumuk-very-compressed.glb');
     const model = gltf.scene;
+
+    model.traverse((child) => {
+        if (!child.isMesh || !child.material) {
+            return;
+        }
+
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        materials.forEach((material) => {
+            material.side = THREE.DoubleSide;
+            material.transparent = false;
+            material.opacity = 1;
+            material.depthWrite = true;
+            material.needsUpdate = true;
+        });
+    });
+
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
