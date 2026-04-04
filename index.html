@@ -127,7 +127,7 @@
         </p>
     </div>
 
-    <form class="message-compose" id="messageForm" autocomplete="ofe">
+    <form class="message-compose" id="messageForm" autocomplete="off">
         <input id="messageInput" class="message-input" type="text" name="message" maxlength="140" placeholder="Type a message..." aria-label="Type a message">
         <button class="message-send" type="submit">send</button>
     </form>
@@ -343,7 +343,7 @@ async function loadDeeModel() {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const scale = 2.8 / maxDim;
+    const scale = (2.8 / maxDim) * 0.7;
 
     model.position.sub(center);
     model.scale.setScalar(scale);
@@ -665,7 +665,7 @@ window.addEventListener('resize', () => {
     function setStatus(state) {
         indicator.style.opacity = '1';
         if (state === 'off')      { dot.style.background = '#9b8f88'; label.textContent = 'camera off'; }
-        if (state === 'ready')    { dot.style.background = '#9b8f888'; label.textContent = 'no hand'; }
+        if (state === 'ready')    { dot.style.background = '#9b8f88'; label.textContent = 'no hand'; }
         if (state === 'detected') { dot.style.background = '#deea4c'; label.textContent = 'hand detected'; }
         if (state === 'pinching') { dot.style.background = '#8A3F44'; label.textContent = 'pinching'; }
     }
@@ -741,5 +741,3 @@ window.addEventListener('resize', () => {
 
 </body>
 </html>
-
-
