@@ -9,56 +9,109 @@
 body {
     margin: 0;
     font-family: 'Arial Narrow Embedded', 'Arial Narrow', sans-serif;
-	background-color: #000000; /* Set your desired background color here */
+    background-color: #000000;
 }
 
 .timestamp-text {
-    color: #9b8f88; /* Set your desired color for the timestamp here */
+    color: #9b8f88;
 }
 
 .video-container {
-	
     display: flex;
     justify-content: center;
     align-items: center;
- 	height: 100vh; /* Full viewport height */
-    /*height: 250px; /* Adjust the height as needed */
-    /*width: 250px; /* Adjust the width as needed */
+    height: 100vh;
 }
 
-.animation-container {
+.status-panel {
     position: fixed;
     bottom: 50px;
     left: 50px;
-border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: min(350px, calc(100vw - 40px));
+}
+
+.animation-container {
+    border-radius: 4px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     background-color: rgba(255, 255, 255, 0.05);
-    width: 350px;
+    width: 100%;
     height: 150px;
     padding-left: 20px;
     overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .animation-container::-webkit-scrollbar {
-    width: 12px; /* Set a width for the scrollbar */
+    width: 12px;
 }
 
 .animation-container::-webkit-scrollbar-thumb {
-    background-color: transparent; /* Make the thumb transparent */
+    background-color: transparent;
 }
 
 .animation-container::-webkit-scrollbar-track {
-    background-color: transparent; /* Make the track transparent */
+    background-color: transparent;
 }
 
+.message-compose {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 14px;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.05);
+    box-sizing: border-box;
+}
+
+.message-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #deea4c;
+    font: inherit;
+    font-size: 18px;
+    caret-color: #deea4c;
+}
+
+.message-input::placeholder {
+    color: #9b8f88;
+}
+
+.message-send {
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #9b8f88;
+    font: inherit;
+    font-size: 18px;
+    text-transform: lowercase;
+    cursor: pointer;
+    padding: 0;
+}
+
+.message-send:hover,
+.message-send:focus-visible {
+    color: #deea4c;
+}
 
 .fade-in-text {
     font-size: 20px;
     color: #deea4c;
-    opacity: 0; /* Start with zero opacity, making the text invisible */
+    opacity: 0;
     animation: fade-in 2s ease forwards;
+}
+
+.message-status {
+    color: #deea4c;
 }
 
 .blinking-cursor {
@@ -71,19 +124,17 @@ border-radius: 4px;
 
 @keyframes fade-in {
     from {
-        opacity: 0; /* Start with zero opacity */
+        opacity: 0;
     }
     to {
-        opacity: 1; /* Fully reveal the text */
+        opacity: 1;
     }
 }
-
 
 @keyframes blink {
     50% {
         opacity: 0;
     }
-
 }
 
 @keyframes fade-out-delayed {
@@ -95,7 +146,6 @@ border-radius: 4px;
     }
 }
 
-/* Update the animation property to use the delayed fade-out */
 .fade-in-text.delayed-fade-out {
     animation: fade-out-delayed 2s ease forwards;
 }
@@ -106,5 +156,22 @@ border-radius: 4px;
     }
     to {
         opacity: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .status-panel {
+        left: 20px;
+        bottom: 20px;
+        width: calc(100vw - 40px);
+    }
+
+    .fade-in-text {
+        font-size: 18px;
+    }
+
+    .message-input,
+    .message-send {
+        font-size: 16px;
     }
 }
