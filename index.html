@@ -37,12 +37,14 @@
 
 <script type="importmap">{
   "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "opentype": "https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js"
   }
 }</script>
 
 <script type="module">
 import * as THREE from 'three';
+import * as opentype from 'opentype';
 
 const canvas = document.getElementById('d-canvas');
 const size = Math.min(window.innerWidth, window.innerHeight) * 0.35;
@@ -71,290 +73,18 @@ const fillLight = new THREE.DirectionalLight(0x8A3F44, 1.0);
 fillLight.position.set(-4, -2, 2);
 scene.add(fillLight);
 
-function createDShape() {
-    const shape = new THREE.Shape();
-    shape.moveTo(-1.1, -1.45);
-    shape.lineTo(-1.1, 1.45);
-    shape.lineTo(0.05, 1.45);
-    shape.bezierCurveTo(1.15, 1.45, 1.95, 0.88, 2.22, 0);
-    shape.bezierCurveTo(1.95, -0.88, 1.15, -1.45, 0.05, -1.45);
-    shape.lineTo(-1.1, -1.45);
-
-    const hole = new THREE.Path();
-    hole.moveTo(-0.5, -0.85);
-    hole.lineTo(-0.5, 0.85);
-    hole.lineTo(0.02, 0.85);
-    hole.bezierCurveTo(0.82, 0.85, 1.28, 0.42, 1.45, 0);
-    hole.bezierCurveTo(1.28, -0.42, 0.82, -0.85, 0.02, -0.85);
-    hole.lineTo(-0.5, -0.85);
-
-    shape.holes.push(hole);
-    return shape;
+function opentypePathToShapes(otPath) {
+    const shapePath = new THREE.ShapePath();
+    for (const cmd of otPath.commands) {
+        switch (cmd.type) {
+            case 'M': shapePath.moveTo(cmd.x, -cmd.y); break;
+            case 'L': shapePath.lineTo(cmd.x, -cmd.y); break;
+            case 'C': shapePath.bezierCurveTo(cmd.x1, -cmd.y1, cmd.x2, -cmd.y2, cmd.x, -cmd.y); break;
+            case 'Q': shapePath.quadraticCurveTo(cmd.x1, -cmd.y1, cmd.x, -cmd.y); break;
+            case 'Z': shapePath.currentPath.autoClose = true; break;
+        }
+    }
+    return shapePath.toShapes(true);
 }
 
-const geometry = new THREE.ExtrudeGeometry(createDShape(), {
-    depth: 0.85,
-    bevelEnabled: true,
-    bevelThickness: 0.14,
-    bevelSize: 0.1,
-    bevelSegments: 10,
-    curveSegments: 48
-});
-
-geometry.center();
-
-const material = new THREE.MeshToonMaterial({
-    color: 0x8A3F44
-});
-
-const mesh = new THREE.Mesh(geometry, material);
-mesh.rotation.x = -0.08;
-mesh.rotation.y = -0.18;
-scene.add(mesh);
-
-let targetX = mesh.rotation.x;
-let targetY = mesh.rotation.y;
-let currentX = mesh.rotation.x;
-let currentY = mesh.rotation.y;
-
-window.handState = { pinching: false, targetRotX: currentX, targetRotY: currentY, currentRotX: currentX, currentRotY: currentY };
-
-document.addEventListener('mousemove', (e) => {
-    if (!window.handState.pinching) {
-        targetY = -0.18 + (((e.clientX / window.innerWidth) * 2) - 1) * 0.22;
-        targetX = -0.08 - (((e.clientY / window.innerHeight) * 2) - 1) * 0.18;
-    }
-});
-
-window.addEventListener('resize', () => {
-    const nextSize = Math.min(window.innerWidth, window.innerHeight) * 0.35;
-    canvas.width = nextSize;
-    canvas.height = nextSize;
-    canvas.style.width = `${nextSize}px`;
-    canvas.style.height = `${nextSize}px`;
-    renderer.setSize(nextSize, nextSize, false);
-});
-
-(function animate() {
-    requestAnimationFrame(animate);
-    if (window.handState.pinching) {
-        targetX = window.handState.targetRotX;
-        targetY = window.handState.targetRotY;
-    }
-    currentX += (targetX - currentX) * 0.06;
-    currentY += (targetY - currentY) * 0.06;
-    mesh.rotation.x = currentX;
-    mesh.rotation.y = currentY;
-    window.handState.currentRotX = currentX;
-    window.handState.currentRotY = currentY;
-    renderer.render(scene, camera);
-})();
-</script>
-
-<script>
-    const animationContainer = document.querySelector('.animation-container');
-    const messageForm = document.getElementById('messageForm');
-    const messageInput = document.getElementById('messageInput');
-
-    document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
-
-    function getCurrentTime() {
-        const now = new Date();
-        const hours = now.getHours().toString().padStart(2, '0');
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        const seconds = now.getSeconds().toString().padStart(2, '0');
-        return `${hours}:${minutes}:${seconds}`;
-    }
-
-    function escapeHtml(value) {
-        return value
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    function playStatusSound() {
-        const sound = document.getElementById('statusSound');
-        sound.volume = 0.8;
-        sound.play();
-    }
-
-    const awayMessageHtml = 'You are now away: AFK<span class="blinking-cursor"> ></span>';
-    const activeMessage = 'You are no longer away.';
-    const inactivityDelayMs = 20000;
-    let inactivityTimeout;
-    let isAway = true;
-
-    function appendSystemMessage(message, allowHtml = false) {
-        const newStatus = document.createElement('p');
-        newStatus.className = 'fade-in-text system-status';
-        const renderedMessage = allowHtml ? message : escapeHtml(message);
-        newStatus.innerHTML = `<span class="timestamp-text" style="color: #9b8f88;">[${getCurrentTime()}]</span> ${renderedMessage}`;
-        animationContainer.appendChild(newStatus);
-        animationContainer.scrollTop = animationContainer.scrollHeight;
-        playStatusSound();
-    }
-
-    function appendUserMessage(message) {
-        const newMessage = document.createElement('p');
-        newMessage.className = 'fade-in-text message-status';
-        newMessage.innerHTML = `<span class="timestamp-text" style="color: #9b8f88;">[${getCurrentTime()}]</span> ${escapeHtml(message)}`;
-        animationContainer.appendChild(newMessage);
-        animationContainer.scrollTop = animationContainer.scrollHeight;
-        playStatusSound();
-    }
-
-    function scheduleAwayStatus() {
-        clearTimeout(inactivityTimeout);
-        inactivityTimeout = setTimeout(() => {
-            if (isAway) {
-                return;
-            }
-
-            appendSystemMessage(awayMessageHtml, true);
-            isAway = true;
-        }, inactivityDelayMs);
-    }
-
-    function markUserActive() {
-        if (isAway) {
-            appendSystemMessage(activeMessage);
-            isAway = false;
-        }
-
-        scheduleAwayStatus();
-    }
-
-    messageInput.addEventListener('focus', function () {
-        markUserActive();
-    });
-
-    messageInput.addEventListener('input', function () {
-        markUserActive();
-    });
-
-    messageForm.addEventListener('submit', function (event) {
-        event.preventDefault();
-
-        const message = messageInput.value.trim();
-        if (!message) {
-            return;
-        }
-
-        markUserActive();
-        appendUserMessage(message);
-        messageInput.value = '';
-        messageInput.focus();
-    });
-</script>
-
-<!-- Hand tracking indicator -->
-<div id="hand-indicator" style="
-    position: fixed; bottom: 50px; right: 50px;
-    font-family: 'Arial Narrow', sans-serif;
-    font-size: 14px; color: #9b8f88;
-    background: rgba(255,255,255,0.05);
-    padding: 8px 14px; border-radius: 4px;
-    display: flex; align-items: center; gap: 8px;
-    opacity: 0; transition: opacity 0.4s;
-">
-    <span id="hand-dot" style="width:8px;height:8px;border-radius:50%;background:#9b8f88;display:inline-block;transition:background 0.2s;"></span>
-    <span id="hand-label">camera off</span>
-</div>
-
-<!-- Hidden video for webcam -->
-<video id="hand-video" style="display:none;" playsinline></video>
-
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
-
-<script>
-(function() {
-    const indicator  = document.getElementById('hand-indicator');
-    const dot        = document.getElementById('hand-dot');
-    const label      = document.getElementById('hand-label');
-    const videoEl    = document.getElementById('hand-video');
-
-    function setStatus(state) {
-        indicator.style.opacity = '1';
-        if (state === 'off')      { dot.style.background = '#9b8f88'; label.textContent = 'camera off'; }
-        if (state === 'ready')    { dot.style.background = '#9b8f88'; label.textContent = 'no hand'; }
-        if (state === 'detected') { dot.style.background = '#deea4c'; label.textContent = 'hand detected'; }
-        if (state === 'pinching') { dot.style.background = '#8A3F44'; label.textContent = 'pinching'; }
-    }
-
-    let wasPinching   = false;
-    let pinchStartX   = 0, pinchStartY   = 0;
-    let baseRotX      = 0, baseRotY      = 0;
-
-    function getPinchMidpoint(lm) {
-        return { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 };
-    }
-
-    function onResults(results) {
-        if (!window.handState) return;
-
-        const lms = results.multiHandLandmarks;
-        if (!lms || lms.length === 0) {
-            window.handState.pinching = false;
-            wasPinching = false;
-            setStatus('ready');
-            return;
-        }
-
-        const lm = lms[0];
-        setStatus('detected');
-
-        const dx = lm[4].x - lm[8].x;
-        const dy = lm[4].y - lm[8].y;
-        const pinchDist = Math.sqrt(dx * dx + dy * dy);
-        const pinching  = pinchDist < 0.06;
-
-        if (pinching) {
-            setStatus('pinching');
-            const mid = getPinchMidpoint(lm);
-            if (!wasPinching) {
-                pinchStartX = mid.x;
-                pinchStartY = mid.y;
-                baseRotX    = window.handState.currentRotX;
-                baseRotY    = window.handState.currentRotY;
-                wasPinching = true;
-            }
-            const sensitivity = 4;
-            window.handState.targetRotX = baseRotX - (mid.y - pinchStartY) * sensitivity;
-            window.handState.targetRotY = baseRotY - (mid.x - pinchStartX) * sensitivity;
-            window.handState.pinching   = true;
-        } else {
-            if (wasPinching) wasPinching = false;
-            window.handState.pinching = false;
-        }
-    }
-
-    function init() {
-        if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
-            setTimeout(init, 200);
-            return;
-        }
-
-        const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
-        hands.onResults(onResults);
-
-        const cam = new Camera(videoEl, {
-            onFrame: async () => { await hands.send({ image: videoEl }); },
-            width: 320, height: 240
-        });
-
-        cam.start().then(() => setStatus('ready')).catch(() => setStatus('off'));
-    }
-
-    init();
-})();
-</script>
-
-</body>
-</html>
-
-
+const FONT_B64 = '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dGVybmF0aW9uYWwgR21iSGh0dHA6Ly9mb250c3RydWN0LmZvbnRzaG9wLmNvbUpvaG4gQWxleGFuZGVyHEVER0UdIHdhcyBidWlsdCB3aXRoIEZvbnRTdHJ1Y3QKaHR0cDovL3d3dy5mb250c2hvcC5jb21odHRwOi8vZm9udHN0cnVjdC5mb250c2hvcC5jb20vZm9udHN0cnVjdGlvbnMvc2hvdy8zNzA4OTBDcmVhdGl2ZSBDb21tb25zIEF0dHJpYnV0aW9uIE5vIERlcml2YXRpdmVzaHR0cDovL2NyZWF0aXZlY29tbW9ucy5vcmcvbGljZW5zZXMvYnktbmQvMy4wL0ZpdmUgYmlnIHF1YWNraW5nIHplcGh5cnMgam9sdCBteSB3YXggYmVkQVE0SWZWQmsAQwBvAHAAeQByAGkAZwBoAHQAIABKAG8AaABuACAAQQBsAGUAeABhAG4AZABlAHIAIAAyADAAMQAwAEUARABHAEUAUgBlAGcAdQBsAGEAcgBGAG8AbgB0AFMAdAByAHUAYwB0ACAARQBEAEcARQBFAEQARwBFACAAUgBlAGcAdQBsAGEAcgBWAGUAcgBzAGkAbwBuACAAMQAuADAARQBEAEcARQBGAG8AbgB0AFMAdAByAHUAYwB0ACAAaQBzACAAYQAgAHQAcgBhAGQAZQBtAGEAcgBrACAAbwBmACAARgBTAEkAIABGAG8AbgB0AFMAaABvAHAAIABJAG4AdABlAHIAbgBhAHQAaQBvAG4AYQBsACAARwBtAGIASABoAHQAdABwADoALwAvAGYAbwBuAHQAcwB0AHIAdQBjAHQALgBmAG8AbgB0AHMAaABvAHAALgBjAG8AbQBKAG8AaABuACAAQQBsAGUAeABhAG4AZABlAHIgHABFAEQARwBFIB0AIAB3AGEAcwAgAGIAdQBpAGwAdAAgAHcAaQB0AGgAIABGAG8AbgB0AFMAdAByAHUAYwB0AAoAaAB0AHQAcAA6AC8ALwB3AHcAdwAuAGYAbwBuAHQAcwBoAG8AcAAuAGMAbwBtAGgAdAB0AHAAOgAvAC8AZgBvAG4AdABzAHQAcgB1AGMAdAAuAGYAbwBuAHQAcwBoAG8AcAAuAGMAbwBtAC8AZgBvAG4AdABzAHQAcgB1AGMAdABpAG8AbgBzAC8AcwBoAG8AdwAvADMANwAwADgAOQAwAEMAcgBlAGEAdABpAHYAZQAgAEMAbwBtAG0AbwBuAHMAIABBAHQAdAByAGkAYgB1AHQAaQBvAG4AIABOAG8AIABEAGUAcgBpAHYAYQB0AGkAdgBlAHMAaAB0AHQAcAA6AC8ALwBjAHIAZQBhAHQAaQB2AGUAYwBvAG0AbQBvAG4AcwAuAG8AcgBnAC8AbABpAGMAZQBuAHMAZQBzAC8AYgB5AC0AbgBkAC8AMwAuADAALwBGAGkAdgBlACAAYgBpAGcAIABxAHUAYQBjAGsAaQBuAGcAIAB6AGUAcABoAHkAcgBzACAAagBvAGwAdAAgAG0AeQAgAHcAYQB4ACAAYgBlAGQAQQBRADQASQBmAFYAQgBrAAAAAAICwAGQAAUABAIAAgAAAAAAAgACAAAAAgAAMwDMAAAAAAQAAAAAAAAAgAAAAQAAAAAAAAAAAAAAAEZTVFIAQAANIB0DAAAAAAADwADAAAAAAQAAAAADAAMAAAAAIAAAAAMAAAAAAAAAZgAzAAAAAAAAAAAAAAAAAAAAAAAAAAAABQAAAAADAAMAAAMABwALABIAFgAAAQEBAQEBAQEBAQEBAQEBAAEAAQEBAQEBgAAA/4UAAAD1AAD/CwAAAHsAAP+FAAAA9QAA/4b/zf/c/9wAAP77AAADAAAAAG0AegAA/4YAjgB7AAD/hQCOAHsAAP+FAI8AegAAAAD/3P/c/8796AMAAAD9AAAAAAACAAAAAADAAwAAAgAGAAABAQEBAQEBAAAAwAAA/0AAAADAAAAAAADA/0AAwAJAAAD9wAAAAgAAAsABwAOAAAMABwAAAQEBAQEBAQEAwP9AAMAAAABAAAAAwP9AAsAAwAAA/0AAAADAAAD/QAAC/+AAAAQgAwAAAwAfAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQJgAED/AP/A/uAAYP9AAEAAwABA/0AAQADAAGAAgP+gAQAAYACA/6AAwP/A/0D/wADA/8D/QP+g/4AAYP8A/6ABQACAAAD/gP7AAMAAAACAAAAAgAAAAIAAAADAAAD/QAAAAMAAAP9AAAD/gAAA/4AAAP+AAAD/QAAAAMAAAP9AAAIAAP9AAwADwAALABkAAAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAUD/QP+AAMABgAAAAMAAAP6AAAD/wAAA/4D/QAAAAYAAAABAAAAAwACA/0D+gAAAAMAAwP9AAMAAAADAAAABQP9A/4D+gADAAAD/QAIAAMAAQAGA/0AAAADA/0AAAP9AAAD/wAAA/0AAAAAFAAD/gAOAA4AAAwAHAAsADwATAAABAQEBAQEBAQEBAQEBAQEBAQEBAQMAAAD/gAAA/4AAAAGAAAD9gAAA/4AAAP+AAAABgAAA/wACAACA/gAAAACAAAD/gP+AAYAAAP6AAwAAgAAA/4D/gAGAAAD+gP2ABAAAAPwAAAAAAwAAAAADQAMAAAIABgAZAAABAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQHA/4D/gACAAED/gABA/4D/QADg/6AAAACAAIAAgAAA/6AAYAAAAMAAAP/gAKD/QP/A/8AAwACA/4ABQABAAAD/wP4AAMAA4ABgAIAAgAAA/4D/gP+g/6AAQAAA/0D/4P9gAAAAQP/AAAEAAAKAAMADQAADAAABAQEBAAAAAADA/0ACgADAAAD/QAAAAAEAAP+AAQADgAAHAAABAQEBAQEBAQCA/4AAAACAAID/gAAAAID/gACAAwAAgAAA/4D9AP+AAAAAAQAA/4ABAAOAAAcAAAEBAQEBAQEBAAAAgAAA/4AAgACAAAD/gP+AAIADAACAAAD/gP0A/4AAAAABAAABAAKAA4AAEQAAAQEBAQEBAQEBAQEBAQEBAQEBAID/oACgAAD/QABAAMAAAACAAAAAwABA/0AAAACg/6D/QP9AAQAAYACgACAAYACA/6AA4AAA/yAAYP+A/6D/4P9g/6AAwP9AAAEAAABAAkACgAALAAABAQEBAQEBAQEAwAAAKAAAACwAAAA0AAAANAAAADQAAAAQAAAAKAAAACwAAAA0AAAANAAAABAAAAAoAAAAKAAAACQ  
