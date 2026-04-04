@@ -128,13 +128,15 @@
 <script type="importmap">{
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-    "opentype": "https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js"
+    "opentype": "https://cdn.jsdelivr.net/npm/opentype.js@1.3.4/dist/opentype.module.js",
+    "gltf-loader": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js"
   }
 }</script>
 
 <script type="module">
 import * as THREE from 'three';
 import * as opentype from 'opentype';
+import { GLTFLoader } from 'gltf-loader';
 
 const canvas = document.getElementById('d-canvas');
 const size = Math.min(window.innerWidth, window.innerHeight) * 0.35;
@@ -163,6 +165,12 @@ const fillLight = new THREE.DirectionalLight(0x8A3F44, 1.0);
 fillLight.position.set(-4, -2, 2);
 scene.add(fillLight);
 
+const gltfLoader = new GLTFLoader();
+const modelRoot = new THREE.Group();
+scene.add(modelRoot);
+
+let currentModelName = 'd';
+
 function opentypePathToShapes(otPath) {
     const shapePath = new THREE.ShapePath();
     for (const cmd of otPath.commands) {
@@ -177,51 +185,7 @@ function opentypePathToShapes(otPath) {
     return shapePath.toShapes(true);
 }
 
-let mesh;
-try {
-    const fontResponse = await fetch('./sources/edge.ttf');
-    if (!fontResponse.ok) {
-        throw new Error(`Font request failed with ${fontResponse.status}`);
-    }
-
-    const fontBuffer = await fontResponse.arrayBuffer();
-    const font = opentype.parse(fontBuffer);
-    const glyph = font.charToGlyph('D');
-    const otPath = glyph.getPath(0, 0, 200);
-    const shapes = opentypePathToShapes(otPath);
-
-    const geometry = new THREE.ExtrudeGeometry(shapes, {
-        depth: 30,
-        bevelEnabled: true,
-        bevelThickness: 3,
-        bevelSize: 2,
-        bevelSegments: 6,
-        curveSegments: 16
-    });
-
-    geometry.computeBoundingBox();
-    const center = new THREE.Vector3();
-    geometry.boundingBox.getCenter(center);
-    geometry.translate(-center.x, -center.y, -center.z);
-
-    const bbox = geometry.boundingBox;
-    const maxDim = Math.max(bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y);
-    const scale = (4 / maxDim) * 0.75;
-    geometry.scale(scale, scale, scale);
-
-    geometry.computeBoundingBox();
-    geometry.boundingBox.getCenter(center);
-    geometry.translate(-center.x, -center.y, -center.z);
-
-    const material = new THREE.MeshToonMaterial({
-        color: 0x8A3F44
-    });
-
-    mesh = new THREE.Mesh(geometry, material);
-    scene.add(mesh);
-} catch (error) {
-    console.error('EDGE font render failed, falling back to simple D shape.', error);
-
+function createFallbackDMesh() {
     const fallbackShape = new THREE.Shape();
     fallbackShape.moveTo(-1.1, -1.45);
     fallbackShape.lineTo(-1.1, 1.45);
@@ -253,18 +217,111 @@ try {
         color: 0x8A3F44
     });
 
-    mesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+    const mesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
     mesh.rotation.x = -0.08;
     mesh.rotation.y = -0.18;
-    scene.add(mesh);
+    return mesh;
 }
 
-let targetX = mesh.rotation.x;
-let targetY = mesh.rotation.y;
-let currentX = mesh.rotation.x;
-let currentY = mesh.rotation.y;
+function clearModelRoot() {
+    while (modelRoot.children.length) {
+        const child = modelRoot.children.pop();
+        modelRoot.remove(child);
+    }
+}
+
+async function buildDModel() {
+    try {
+        const fontResponse = await fetch('./sources/edge.ttf');
+        if (!fontResponse.ok) {
+            throw new Error(`Font request failed with ${fontResponse.status}`);
+        }
+
+        const fontBuffer = await fontResponse.arrayBuffer();
+        const font = opentype.parse(fontBuffer);
+        const glyph = font.charToGlyph('D');
+        const otPath = glyph.getPath(0, 0, 200);
+        const shapes = opentypePathToShapes(otPath);
+
+        const geometry = new THREE.ExtrudeGeometry(shapes, {
+            depth: 30,
+            bevelEnabled: true,
+            bevelThickness: 3,
+            bevelSize: 2,
+            bevelSegments: 6,
+            curveSegments: 16
+        });
+
+        geometry.computeBoundingBox();
+        const center = new THREE.Vector3();
+        geometry.boundingBox.getCenter(center);
+        geometry.translate(-center.x, -center.y, -center.z);
+
+        const bbox = geometry.boundingBox;
+        const maxDim = Math.max(bbox.max.x - bbox.min.x, bbox.max.y - bbox.min.y);
+        const scale = (4 / maxDim) * 0.75;
+        geometry.scale(scale, scale, scale);
+
+        geometry.computeBoundingBox();
+        geometry.boundingBox.getCenter(center);
+        geometry.translate(-center.x, -center.y, -center.z);
+
+        const material = new THREE.MeshToonMaterial({
+            color: 0x8A3F44
+        });
+
+        return new THREE.Mesh(geometry, material);
+    } catch (error) {
+        console.error('EDGE font render failed, falling back to simple D shape.', error);
+        return createFallbackDMesh();
+    }
+}
+
+async function loadMumukModel() {
+    const gltf = await gltfLoader.loadAsync('./sources/mumuk-very-compressed.glb');
+    const model = gltf.scene;
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = 2.8 / maxDim;
+
+    model.position.sub(center);
+    model.scale.setScalar(scale);
+    model.rotation.x = -0.08;
+    model.rotation.y = -0.24;
+
+    return model;
+}
+
+async function setDisplayedModel(modelName) {
+    if (modelName === currentModelName && modelRoot.children.length) {
+        return;
+    }
+
+    clearModelRoot();
+
+    if (modelName === 'mumuk') {
+        const mumukModel = await loadMumukModel();
+        modelRoot.add(mumukModel);
+        currentModelName = 'mumuk';
+        return;
+    }
+
+    const dModel = await buildDModel();
+    modelRoot.add(dModel);
+    currentModelName = 'd';
+}
+
+await setDisplayedModel('d');
+
+let targetX = modelRoot.rotation.x;
+let targetY = modelRoot.rotation.y;
+let currentX = modelRoot.rotation.x;
+let currentY = modelRoot.rotation.y;
 
 window.handState = { pinching: false, targetRotX: currentX, targetRotY: currentY, currentRotX: currentX, currentRotY: currentY };
+window.afkScene = { setDisplayedModel, getCurrentModelName: () => currentModelName };
 
 document.addEventListener('mousemove', (e) => {
     if (!window.handState.pinching) {
@@ -290,8 +347,8 @@ window.addEventListener('resize', () => {
     }
     currentX += (targetX - currentX) * 0.06;
     currentY += (targetY - currentY) * 0.06;
-    mesh.rotation.x = currentX;
-    mesh.rotation.y = currentY;
+    modelRoot.rotation.x = currentX;
+    modelRoot.rotation.y = currentY;
     window.handState.currentRotX = currentX;
     window.handState.currentRotY = currentY;
     renderer.render(scene, camera);
@@ -393,6 +450,15 @@ window.addEventListener('resize', () => {
         playStatusSound();
     }
 
+    function appendCommandMessage(message) {
+        const newMessage = document.createElement('p');
+        newMessage.className = 'fade-in-text system-status';
+        newMessage.innerHTML = `<span class="timestamp-text" style="color: #9b8f88;">[${getCurrentTime()}]</span> ${escapeHtml(message)}`;
+        animationContainer.appendChild(newMessage);
+        animationContainer.scrollTop = animationContainer.scrollHeight;
+        playStatusSound();
+    }
+
     function scheduleAwayStatus() {
         clearTimeout(inactivityTimeout);
         inactivityTimeout = setTimeout(() => {
@@ -431,6 +497,25 @@ window.addEventListener('resize', () => {
         }
 
         markUserActive();
+
+        if (message === '/mumuk') {
+            window.afkScene?.setDisplayedModel('mumuk')
+                .then(() => appendCommandMessage('Switched model: mumuk'))
+                .catch(() => appendCommandMessage('Could not load mumuk.'));
+            messageInput.value = '';
+            messageInput.focus();
+            return;
+        }
+
+        if (message === '/reset') {
+            window.afkScene?.setDisplayedModel('d')
+                .then(() => appendCommandMessage('Switched model: D'))
+                .catch(() => appendCommandMessage('Could not switch back to D.'));
+            messageInput.value = '';
+            messageInput.focus();
+            return;
+        }
+
         appendUserMessage(message);
         messageInput.value = '';
         messageInput.focus();
