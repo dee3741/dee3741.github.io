@@ -105,6 +105,10 @@
         <source src="sources/message.mp3" type="audio/mp3">
         Your browser does not support the audio tag.
     </audio>
+    <audio id="mumukSound" preload="auto">
+        <source src="sources/meow-meow.mp3" type="audio/mpeg">
+        Your browser does not support the audio tag.
+    </audio>
 
 <div class="video-container">
         <canvas id="d-canvas"></canvas>
@@ -412,6 +416,7 @@ window.addEventListener('resize', () => {
     const animationContainer = document.querySelector('.animation-container');
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
+    const mumukSound = document.getElementById('mumukSound');
 
     document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
 
@@ -436,6 +441,19 @@ window.addEventListener('resize', () => {
         const sound = document.getElementById('statusSound');
         sound.volume = 0.8;
         sound.play();
+    }
+
+    function stopMumukSound() {
+        mumukSound.pause();
+        mumukSound.currentTime = 0;
+    }
+
+    function playMumukSound() {
+        stopMumukSound();
+        mumukSound.volume = 0.3;
+        mumukSound.play().catch((error) => {
+            console.error('Could not play mumuk sound.', error);
+        });
     }
 
     const awayMessageHtml = 'You are now away: AFK<span class="blinking-cursor"> ></span>';
@@ -513,7 +531,10 @@ window.addEventListener('resize', () => {
 
         if (message === '/mumuk') {
             window.afkScene?.setDisplayedModel('mumuk')
-                .then(() => appendCommandMessage('Switched model: mumuk'))
+                .then(() => {
+                    playMumukSound();
+                    appendCommandMessage('Switched model: mumuk');
+                })
                 .catch(() => appendCommandMessage('Could not load mumuk.'));
             messageInput.value = '';
             messageInput.focus();
@@ -521,6 +542,7 @@ window.addEventListener('resize', () => {
         }
 
         if (message === '/reset') {
+            stopMumukSound();
             window.afkScene?.setDisplayedModel('d')
                 .then(() => appendCommandMessage('Switched model: D'))
                 .catch(() => appendCommandMessage('Could not switch back to D.'));
