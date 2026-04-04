@@ -151,7 +151,25 @@ import { DRACOLoader } from 'draco-loader';
 import { KTX2Loader } from 'ktx2-loader';
 
 const canvas = document.getElementById('d-canvas');
-const size = Math.min(window.innerWidth, window.innerHeight) * 0.35;
+const baseCanvasScale = 0.35;
+const deeCanvasMultiplier = 1.2;
+const deeModelScaleMultiplier = 1.2;
+
+function getCanvasSize(modelName = currentModelName) {
+    const multiplier = modelName === 'dee374' ? deeCanvasMultiplier : 1;
+    return Math.min(window.innerWidth, window.innerHeight) * baseCanvasScale * multiplier;
+}
+
+function applyCanvasSize(modelName = currentModelName) {
+    const nextSize = getCanvasSize(modelName);
+    canvas.width = nextSize;
+    canvas.height = nextSize;
+    canvas.style.width = `${nextSize}px`;
+    canvas.style.height = `${nextSize}px`;
+    renderer.setSize(nextSize, nextSize, false);
+}
+
+const size = getCanvasSize('d');
 canvas.width = size;
 canvas.height = size;
 canvas.style.width = `${size}px`;
@@ -343,7 +361,7 @@ async function loadDeeModel() {
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z) || 1;
-    const scale = (2.8 / maxDim) * 0.7;
+    const scale = (2.8 / maxDim) * 0.7 * deeModelScaleMultiplier;
 
     model.position.sub(center);
     model.scale.setScalar(scale);
@@ -358,6 +376,7 @@ async function setDisplayedModel(modelName) {
         return;
     }
 
+    applyCanvasSize(modelName);
     clearModelRoot();
 
     if (modelName === 'mumuk') {
@@ -397,12 +416,7 @@ document.addEventListener('mousemove', (e) => {
 });
 
 window.addEventListener('resize', () => {
-    const nextSize = Math.min(window.innerWidth, window.innerHeight) * 0.35;
-    canvas.width = nextSize;
-    canvas.height = nextSize;
-    canvas.style.width = `${nextSize}px`;
-    canvas.style.height = `${nextSize}px`;
-    renderer.setSize(nextSize, nextSize, false);
+    applyCanvasSize();
 });
 
 (function animate() {
