@@ -109,6 +109,10 @@
         <source src="sources/meow-meow.mp3" type="audio/mpeg">
         Your browser does not support the audio tag.
     </audio>
+    <audio id="deeSound" preload="auto">
+        <source src="sources/dee-sound.mp3" type="audio/mpeg">
+        Your browser does not support the audio tag.
+    </audio>
 
 <div class="video-container">
         <canvas id="d-canvas"></canvas>
@@ -123,7 +127,7 @@
         </p>
     </div>
 
-    <form class="message-compose" id="messageForm" autocomplete="off">
+    <form class="message-compose" id="messageForm" autocomplete="ofe">
         <input id="messageInput" class="message-input" type="text" name="message" maxlength="140" placeholder="Type a message..." aria-label="Type a message">
         <button class="message-send" type="submit">send</button>
     </form>
@@ -297,7 +301,23 @@ async function buildDModel() {
 async function loadMumukModel() {
     const gltf = await gltfLoader.loadAsync('./sources/mumuk-very-compressed.glb');
     const model = gltf.scene;
+    normalizeImportedModelMaterials(model);
 
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z) || 1;
+    const scale = 2.8 / maxDim;
+
+    model.position.sub(center);
+    model.scale.setScalar(scale);
+    model.rotation.x = -0.08;
+    model.rotation.y = -0.24;
+
+    return model;
+}
+
+function normalizeImportedModelMaterials(model) {
     model.traverse((child) => {
         if (!child.isMesh || !child.material) {
             return;
@@ -312,6 +332,12 @@ async function loadMumukModel() {
             material.needsUpdate = true;
         });
     });
+}
+
+async function loadDeeModel() {
+    const gltf = await gltfLoader.loadAsync('./sources/dee.glb');
+    const model = gltf.scene;
+    normalizeImportedModelMaterials(model);
 
     const box = new THREE.Box3().setFromObject(model);
     const center = box.getCenter(new THREE.Vector3());
@@ -338,6 +364,13 @@ async function setDisplayedModel(modelName) {
         const mumukModel = await loadMumukModel();
         modelRoot.add(mumukModel);
         currentModelName = 'mumuk';
+        return;
+    }
+
+    if (modelName === 'dee374') {
+        const deeModel = await loadDeeModel();
+        modelRoot.add(deeModel);
+        currentModelName = 'dee374';
         return;
     }
 
@@ -433,6 +466,7 @@ window.addEventListener('resize', () => {
     const messageForm = document.getElementById('messageForm');
     const messageInput = document.getElementById('messageInput');
     const mumukSound = document.getElementById('mumukSound');
+    const deeSound = document.getElementById('deeSound');
 
     document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
 
@@ -469,6 +503,19 @@ window.addEventListener('resize', () => {
         mumukSound.volume = 0.3;
         mumukSound.play().catch((error) => {
             console.error('Could not play mumuk sound.', error);
+        });
+    }
+
+    function stopDeeSound() {
+        deeSound.pause();
+        deeSound.currentTime = 0;
+    }
+
+    function playDeeSound() {
+        stopDeeSound();
+        deeSound.volume = 0.5;
+        deeSound.play().catch((error) => {
+            console.error('Could not play dee sound.', error);
         });
     }
 
@@ -548,6 +595,7 @@ window.addEventListener('resize', () => {
         if (message === '/mumuk') {
             window.afkScene?.setDisplayedModel('mumuk')
                 .then(() => {
+                    stopDeeSound();
                     playMumukSound();
                     appendCommandMessage('Switched model: mumuk');
                 })
@@ -557,8 +605,22 @@ window.addEventListener('resize', () => {
             return;
         }
 
+        if (message === '/dee374') {
+            window.afkScene?.setDisplayedModel('dee374')
+                .then(() => {
+                    stopMumukSound();
+                    playDeeSound();
+                    appendCommandMessage('Switched model: dee374');
+                })
+                .catch(() => appendCommandMessage('Could not load dee374.'));
+            messageInput.value = '';
+            messageInput.focus();
+            return;
+        }
+
         if (message === '/reset') {
             stopMumukSound();
+            stopDeeSound();
             window.afkScene?.setDisplayedModel('d')
                 .then(() => appendCommandMessage('Switched model: D'))
                 .catch(() => appendCommandMessage('Could not switch back to D.'));
@@ -603,7 +665,7 @@ window.addEventListener('resize', () => {
     function setStatus(state) {
         indicator.style.opacity = '1';
         if (state === 'off')      { dot.style.background = '#9b8f88'; label.textContent = 'camera off'; }
-        if (state === 'ready')    { dot.style.background = '#9b8f88'; label.textContent = 'no hand'; }
+        if (state === 'ready')    { dot.style.background = '#9b8f888'; label.textContent = 'no hand'; }
         if (state === 'detected') { dot.style.background = '#deea4c'; label.textContent = 'hand detected'; }
         if (state === 'pinching') { dot.style.background = '#8A3F44'; label.textContent = 'pinching'; }
     }
