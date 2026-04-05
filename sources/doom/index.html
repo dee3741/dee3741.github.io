@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doom Mode</title>
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            color: #e0e0e0;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        body {
+            position: relative;
+        }
+
+        #status-overlay {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: #000;
+            text-align: center;
+            z-index: 2;
+        }
+
+        #status-copy {
+            max-width: 440px;
+        }
+
+        #status {
+            margin-bottom: 16px;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        #hint {
+            font-size: 13px;
+            line-height: 1.5;
+            color: #b9b9b9;
+        }
+
+        #output {
+            display: none;
+            width: 100%;
+            height: 100%;
+            box-sizing: border-box;
+            margin: 0;
+            padding: 12px;
+            resize: none;
+            border: 0;
+            outline: none;
+            color: #ccc;
+            background: #000;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px;
+        }
+
+        #canvas {
+            display: none;
+            width: min(100vw, calc(100vh * 4 / 3));
+            height: min(100vh, calc(100vw * 3 / 4));
+            margin: auto;
+            outline: none;
+            background: #000;
+        }
+
+        @supports (height: 1dvh) {
+            #canvas {
+                width: min(100dvw, calc(100dvh * 4 / 3));
+                height: min(100dvh, calc(100dvw * 3 / 4));
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="status-overlay">
+        <div id="status-copy">
+            <div id="status">Preparing DOOM mode...</div>
+            <div id="hint">WASD to move, mouse to aim, Space to use, Esc for the menu. Click inside the game once it appears to focus controls.</div>
+        </div>
+    </div>
+
+    <textarea id="output" readonly></textarea>
+    <canvas id="canvas" oncontextmenu="event.preventDefault();" tabindex="-1"></canvas>
+
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        const iwadName = params.get('iwad') || 'freedoom2.wad';
+        const statusOverlay = document.getElementById('status-overlay');
+        const statusElement = document.getElementById('status');
+        const outputElement = document.getElementById('output');
+        const canvasElement = document.getElementById('canvas');
+
+        function appendOutput(text) {
+            outputElement.value += `${text}\n`;
+            if (outputElement.value.length > 2097152) {
+                outputElement.value = outputElement.value.slice(-1048576);
+            }
+            outputElement.scrollTop = outputElement.scrollHeight;
+        }
+
+        function setStatus(text) {
+            statusElement.innerHTML = text || '';
+        }
+
+        function showCanvas() {
+            statusOverlay.style.display = 'none';
+            outputElement.style.display = 'none';
+            canvasElement.style.display = 'block';
+            canvasElement.focus();
+        }
+
+        var Module = {
+            arguments: ['-iwad', iwadName],
+            preRun: [function () {
+                Module.addRunDependency('iwad-fetch');
+                setStatus(`Loading ${iwadName}...`);
+
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', `./${iwadName}`, true);
+                xhr.responseType = 'arraybuffer';
+                xhr.onprogress = function (event) {
+                    if (event.lengthComputable) {
+                        setStatus(`Loading ${iwadName}...<br>(${event.loaded}/${event.total} bytes)`);
+                    } else {
+                        setStatus(`Loading ${iwadName}...<br>(${event.loaded} bytes)`);
+                    }
+                };
+                xhr.onload = function () {
+                    if ((xhr.status >= 200 && xhr.status < 300) || (xhr.status === 0 && xhr.response)) {
+                        const bytes = new Uint8Array(xhr.response);
+                        FS.writeFile(`/${iwadName}`, bytes);
+                    } else {
+                        appendOutput(`Could not load ${iwadName}.`);
+                        setStatus(`Could not load ${iwadName}.`);
+                    }
+                    Module.removeRunDependency('iwad-fetch');
+                };
+                xhr.onerror = function () {
+                    appendOutput(`Network failure while loading ${iwadName}.`);
+                    setStatus(`Network failure while loading ${iwadName}.`);
+                    Module.removeRunDependency('iwad-fetch');
+                };
+                xhr.send();
+            }],
+            canvas: (function () {
+                canvasElement.addEventListener('webglcontextlost', function (event) {
+                    event.preventDefault();
+                    setStatus('WebGL context lost. Reload Doom mode to try again.');
+                }, false);
+                return canvasElement;
+            })(),
+            print: function (text) {
+                console.log(text);
+                appendOutput(text);
+            },
+            printErr: function (text) {
+                console.error(text);
+                appendOutput(`(!) ${text}`);
+            },
+            setStatus: function (text) {
+                setStatus(text);
+            },
+            onRuntimeInitialized: function () {
+                setStatus('');
+                showCanvas();
+            },
+            hideConsole: function () {
+                outputElement.style.display = 'none';
+                canvasElement.style.display = 'block';
+                canvasElement.focus();
+            },
+            showConsole: function () {
+                canvasElement.style.display = 'none';
+                outputElement.style.display = 'block';
+                outputElement.focus();
+            },
+            captureMouse: function () {
+                if (document.pointerLockElement !== canvasElement && canvasElement.requestPointerLock) {
+                    canvasElement.requestPointerLock();
+                }
+            },
+            winResized: function () {
+                canvasElement.style.width = '';
+                canvasElement.style.height = '';
+            }
+        };
+
+        const mainScript = document.createElement('script');
+        mainScript.src = './index.js';
+        mainScript.async = true;
+        document.body.appendChild(mainScript);
+    </script>
+</body>
+</html>
