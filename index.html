@@ -515,7 +515,11 @@ window.addEventListener('resize', () => {
     const doomShell = document.getElementById('doom-shell');
     const doomFrame = document.getElementById('doom-frame');
     const dustLayer = document.getElementById('dust-layer');
-    const doomModeBaseUrl = './sources/doom/index.html?iwad=freedoom2.wad&asset=freedoom-0.13.0.zip';
+    const doomAssetName = 'freedoom-0.13.0.zip';
+
+    function buildDoomModeUrl(iwadName) {
+        return `./sources/doom/index.html?iwad=${encodeURIComponent(iwadName)}&asset=${encodeURIComponent(doomAssetName)}`;
+    }
 
     document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
 
@@ -568,16 +572,16 @@ window.addEventListener('resize', () => {
         });
     }
 
-    function enterDoomMode() {
+    function enterDoomMode(iwadName) {
         if (doomShell.classList.contains('active')) {
-            return;
+            doomFrame.src = 'about:blank';
         }
 
         stopMumukSound();
         stopDeeSound();
         sceneCanvas.style.display = 'none';
         dustLayer.style.display = 'none';
-        doomFrame.src = `${doomModeBaseUrl}&t=${Date.now()}`;
+        doomFrame.src = `${buildDoomModeUrl(iwadName)}&t=${Date.now()}`;
         doomShell.classList.add('active');
         doomShell.setAttribute('aria-hidden', 'false');
     }
@@ -668,8 +672,16 @@ window.addEventListener('resize', () => {
         markUserActive();
 
         if (message === '/doom.exe') {
-            enterDoomMode();
-            appendCommandMessage('Doom loaded. Click inside the game to focus controls.');
+            enterDoomMode('freedoom1.wad');
+            appendCommandMessage('Freedoom Phase 1 loaded. Click inside the game to focus controls.');
+            messageInput.value = '';
+            messageInput.focus();
+            return;
+        }
+
+        if (message === '/doom2.exe') {
+            enterDoomMode('freedoom2.wad');
+            appendCommandMessage('Freedoom Phase 2 loaded. Click inside the game to focus controls.');
             messageInput.value = '';
             messageInput.focus();
             return;
