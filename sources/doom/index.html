@@ -91,9 +91,11 @@
     <textarea id="output" readonly></textarea>
     <canvas id="canvas" oncontextmenu="event.preventDefault();" tabindex="-1"></canvas>
 
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
     <script>
         const params = new URLSearchParams(window.location.search);
         const iwadName = params.get('iwad') || 'freedoom2.wad';
+        const assetName = params.get('asset') || 'freedoom-0.13.0.zip';
         const statusOverlay = document.getElementById('status-overlay');
         const statusElement = document.getElementById('status');
         const outputElement = document.getElementById('output');
@@ -118,36 +120,64 @@
             canvasElement.focus();
         }
 
+        function finishWadLoad(fileBytes) {
+            FS.writeFile(`/${iwadName}`, fileBytes);
+            Module.removeRunDependency('iwad-fetch');
+        }
+
+        function failWadLoad(message) {
+            appendOutput(message);
+            setStatus(message);
+            Module.removeRunDependency('iwad-fetch');
+        }
+
         var Module = {
             arguments: ['-iwad', iwadName],
             preRun: [function () {
                 Module.addRunDependency('iwad-fetch');
-                setStatus(`Loading ${iwadName}...`);
+                setStatus(`Loading ${assetName}...`);
 
                 const xhr = new XMLHttpRequest();
-                xhr.open('GET', `./${iwadName}`, true);
+                xhr.open('GET', `./${assetName}`, true);
                 xhr.responseType = 'arraybuffer';
                 xhr.onprogress = function (event) {
                     if (event.lengthComputable) {
-                        setStatus(`Loading ${iwadName}...<br>(${event.loaded}/${event.total} bytes)`);
+                        setStatus(`Loading ${assetName}...<br>(${event.loaded}/${event.total} bytes)`);
                     } else {
-                        setStatus(`Loading ${iwadName}...<br>(${event.loaded} bytes)`);
+                        setStatus(`Loading ${assetName}...<br>(${event.loaded} bytes)`);
                     }
                 };
                 xhr.onload = function () {
                     if ((xhr.status >= 200 && xhr.status < 300) || (xhr.status === 0 && xhr.response)) {
                         const bytes = new Uint8Array(xhr.response);
-                        FS.writeFile(`/${iwadName}`, bytes);
+
+                        if (assetName.toLowerCase().endsWith('.zip')) {
+                            try {
+                                const archive = fflate.unzipSync(bytes);
+                                const wadKey = Object.keys(archive).find((name) => name.toLowerCase().endsWith(`/${iwadName}`)) ||
+                                    Object.keys(archive).find((name) => name.toLowerCase().endsWith(iwadName.toLowerCase()));
+
+                                if (!wadKey) {
+                                    failWadLoad(`Could not find ${iwadName} inside ${assetName}.`);
+                                    return;
+                                }
+
+                                finishWadLoad(archive[wadKey]);
+                            } catch (error) {
+                                console.error('Could not extract Freedoom ZIP.', error);
+                                failWadLoad(`Could not extract ${assetName}.`);
+                            }
+                            return;
+                        }
+
+                        finishWadLoad(bytes);
                     } else {
-                        appendOutput(`Could not load ${iwadName}.`);
-                        setStatus(`Could not load ${iwadName}.`);
+                        failWadLoad(`Could not load ${assetName}.`);
+                        return;
                     }
-                    Module.removeRunDependency('iwad-fetch');
                 };
                 xhr.onerror = function () {
-                    appendOutput(`Network failure while loading ${iwadName}.`);
-                    setStatus(`Network failure while loading ${iwadName}.`);
-                    Module.removeRunDependency('iwad-fetch');
+                    failWadLoad(`Network failure while loading ${assetName}.`);
                 };
                 xhr.send();
             }],
