@@ -515,7 +515,7 @@ window.addEventListener('resize', () => {
     const doomShell = document.getElementById('doom-shell');
     const doomFrame = document.getElementById('doom-frame');
     const dustLayer = document.getElementById('dust-layer');
-    const doomModeUrl = './sources/doom/index.html';
+    const doomModeBaseUrl = './sources/doom/index.html?iwad=freedoom2.wad&asset=freedoom-0.13.0.zip';
 
     document.getElementById('timestamp').innerHTML = `[${getCurrentTime()}]&nbsp;`;
 
@@ -577,7 +577,7 @@ window.addEventListener('resize', () => {
         stopDeeSound();
         sceneCanvas.style.display = 'none';
         dustLayer.style.display = 'none';
-        doomFrame.src = doomModeUrl;
+        doomFrame.src = `${doomModeBaseUrl}&t=${Date.now()}`;
         doomShell.classList.add('active');
         doomShell.setAttribute('aria-hidden', 'false');
     }
