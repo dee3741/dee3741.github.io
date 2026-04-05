@@ -77,7 +77,7 @@
         }
 
         .status-panel,
-        #hand-indicator {
+        .tracking-panel {
             position: relative;
             z-index: 4;
         }
@@ -97,6 +97,91 @@
 
         .message-compose {
             min-height: 48px;
+        }
+
+        .tracking-panel {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            width: min(240px, calc(100vw - 40px));
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 10px;
+        }
+
+        .tracking-toggle-button,
+        .tracking-status {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 14px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            color: #9b8f88;
+            font-family: 'Arial Narrow', sans-serif;
+            font-size: 14px;
+            backdrop-filter: blur(4px);
+        }
+
+        .tracking-toggle-button {
+            border: 0;
+            cursor: pointer;
+            text-align: left;
+        }
+
+        .tracking-toggle-button:hover {
+            background: rgba(255, 255, 255, 0.07);
+        }
+
+        .tracking-toggle-button:focus-visible {
+            outline: 1px solid rgba(222, 234, 76, 0.65);
+            outline-offset: 2px;
+        }
+
+        .tracking-toggle-track {
+            position: relative;
+            width: 34px;
+            height: 18px;
+            border-radius: 999px;
+            background: rgba(155, 143, 136, 0.35);
+            transition: background 0.2s ease;
+            flex: 0 0 auto;
+        }
+
+        .tracking-toggle-thumb {
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 14px;
+            height: 14px;
+            border-radius: 999px;
+            background: #d4c8bf;
+            transition: transform 0.2s ease, background 0.2s ease;
+        }
+
+        .tracking-toggle-button.is-on .tracking-toggle-track {
+            background: rgba(222, 234, 76, 0.35);
+        }
+
+        .tracking-toggle-button.is-on .tracking-toggle-thumb {
+            transform: translateX(16px);
+            background: #deea4c;
+        }
+
+        .tracking-status {
+            justify-content: flex-start;
+        }
+
+        .tracking-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #9b8f88;
+            display: inline-block;
+            transition: background 0.2s ease;
+            flex: 0 0 auto;
         }
 
         @keyframes dust-float {
@@ -119,6 +204,12 @@
 
             .animation-container {
                 max-height: min(140px, calc(100svh - 108px));
+            }
+
+            .tracking-panel {
+                right: 16px;
+                bottom: 16px;
+                width: min(220px, calc(100vw - 32px));
             }
         }
     </style>
@@ -673,7 +764,7 @@ window.addEventListener('resize', () => {
 
         if (message === '/doom.exe') {
             enterDoomMode('freedoom1.wad');
-            appendCommandMessage('Freedoom Phase 1 loaded. Click inside the game to focus controls.');
+            appendCommandMessage('rip and tear');
             messageInput.value = '';
             messageInput.focus();
             return;
@@ -681,7 +772,7 @@ window.addEventListener('resize', () => {
 
         if (message === '/doom2.exe') {
             enterDoomMode('freedoom2.wad');
-            appendCommandMessage('Freedoom Phase 2 loaded. Click inside the game to focus controls.');
+            appendCommandMessage('rip and tear, again');
             messageInput.value = '';
             messageInput.focus();
             return;
@@ -693,7 +784,7 @@ window.addEventListener('resize', () => {
                 .then(() => {
                     stopDeeSound();
                     playMumukSound();
-                    appendCommandMessage('Switched model: mumuk');
+                    appendCommandMessage('mumuk is here');
                 })
                 .catch(() => appendCommandMessage('Could not load mumuk.'));
             messageInput.value = '';
@@ -707,7 +798,7 @@ window.addEventListener('resize', () => {
                 .then(() => {
                     stopMumukSound();
                     playDeeSound();
-                    appendCommandMessage('Switched model: dee374');
+                    appendCommandMessage('dee\'s outie appreciates modern jazz');
                 })
                 .catch(() => appendCommandMessage('Could not load dee374.'));
             messageInput.value = '';
@@ -720,7 +811,7 @@ window.addEventListener('resize', () => {
             stopMumukSound();
             stopDeeSound();
             window.afkScene?.setDisplayedModel('d')
-                .then(() => appendCommandMessage('Switched model: D'))
+                .then(() => appendCommandMessage('[system reset]'))
                 .catch(() => appendCommandMessage('Could not switch back to D.'));
             messageInput.value = '';
             messageInput.focus();
@@ -733,51 +824,120 @@ window.addEventListener('resize', () => {
     });
 </script>
 
-<!-- Hand tracking indicator -->
-<div id="hand-indicator" style="
-    position: fixed; bottom: 50px; right: 50px;
-    font-family: 'Arial Narrow', sans-serif;
-    font-size: 14px; color: #9b8f88;
-    background: rgba(255,255,255,0.05);
-    padding: 8px 14px; border-radius: 4px;
-    display: flex; align-items: center; gap: 8px;
-    opacity: 0; transition: opacity 0.4s;
-">
-    <span id="hand-dot" style="width:8px;height:8px;border-radius:50%;background:#9b8f88;display:inline-block;transition:background 0.2s;"></span>
-    <span id="hand-label">camera off</span>
+<div class="tracking-panel">
+    <button id="tracking-toggle" class="tracking-toggle-button" type="button" role="switch" aria-checked="false">
+        <span>camera access</span>
+        <span class="tracking-toggle-track" aria-hidden="true">
+            <span class="tracking-toggle-thumb"></span>
+        </span>
+    </button>
+    <div id="hand-indicator" class="tracking-status" aria-live="polite">
+        <span id="hand-dot" class="tracking-status-dot"></span>
+        <span id="hand-label">tracking mode off</span>
+    </div>
 </div>
 
 <!-- Hidden video for webcam -->
-<video id="hand-video" style="display:none;" playsinline></video>
+<video id="hand-video" style="display:none;" playsinline muted></video>
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1640029074/camera_utils.js" crossorigin="anonymous"></script>
 
 <script>
 (function() {
-    const indicator  = document.getElementById('hand-indicator');
+    const toggle     = document.getElementById('tracking-toggle');
     const dot        = document.getElementById('hand-dot');
     const label      = document.getElementById('hand-label');
     const videoEl    = document.getElementById('hand-video');
+    videoEl.muted = true;
 
-    function setStatus(state) {
-        indicator.style.opacity = '1';
-        if (state === 'off')      { dot.style.background = '#9b8f88'; label.textContent = 'camera off'; }
-        if (state === 'ready')    { dot.style.background = '#9b8f88'; label.textContent = 'no hand'; }
-        if (state === 'detected') { dot.style.background = '#deea4c'; label.textContent = 'hand detected'; }
-        if (state === 'pinching') { dot.style.background = '#8A3F44'; label.textContent = 'pinching'; }
+    let hands = null;
+    let mediaStream = null;
+    let trackingEnabled = false;
+    let isProcessingFrame = false;
+    let wasPinching = false;
+    let pinchStartX = 0, pinchStartY = 0;
+    let baseRotX = 0, baseRotY = 0;
+
+    function setToggleState(enabled) {
+        toggle.classList.toggle('is-on', enabled);
+        toggle.setAttribute('aria-checked', String(enabled));
     }
 
-    let wasPinching   = false;
-    let pinchStartX   = 0, pinchStartY   = 0;
-    let baseRotX      = 0, baseRotY      = 0;
+    function setStatus(state) {
+        if (state === 'off') {
+            dot.style.background = '#9b8f88';
+            label.textContent = 'tracking mode off';
+            return;
+        }
+
+        if (state === 'requesting') {
+            dot.style.background = '#9b8f88';
+            label.textContent = 'requesting camera access...';
+            return;
+        }
+
+        if (state === 'ready') {
+            dot.style.background = '#9b8f88';
+            label.textContent = 'no hand';
+            return;
+        }
+
+        if (state === 'detected') {
+            dot.style.background = '#deea4c';
+            label.textContent = 'hand detected';
+            return;
+        }
+
+        if (state === 'pinching') {
+            dot.style.background = '#8A3F44';
+            label.textContent = 'pinching';
+        }
+    }
+
+    function resetPinchState() {
+        wasPinching = false;
+        if (window.handState) {
+            window.handState.pinching = false;
+        }
+    }
+
+    async function waitForHandsLibrary() {
+        if (typeof Hands !== 'undefined') {
+            return;
+        }
+
+        await new Promise((resolve) => {
+            const check = () => {
+                if (typeof Hands !== 'undefined') {
+                    resolve();
+                    return;
+                }
+
+                setTimeout(check, 100);
+            };
+
+            check();
+        });
+    }
+
+    async function ensureHands() {
+        if (hands) {
+            return hands;
+        }
+
+        await waitForHandsLibrary();
+        hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
+        hands.onResults(onResults);
+        return hands;
+    }
 
     function getPinchMidpoint(lm) {
         return { x: (lm[4].x + lm[8].x) / 2, y: (lm[4].y + lm[8].y) / 2 };
     }
 
     function onResults(results) {
-        if (!window.handState) return;
+        if (!trackingEnabled || !window.handState) return;
 
         const lms = results.multiHandLandmarks;
         if (!lms || lms.length === 0) {
@@ -815,25 +975,109 @@ window.addEventListener('resize', () => {
         }
     }
 
-    function init() {
-        if (typeof Hands === 'undefined' || typeof Camera === 'undefined') {
-            setTimeout(init, 200);
+    async function processVideoFrame() {
+        if (!trackingEnabled || !hands || !mediaStream) {
             return;
         }
 
-        const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1646424915/${f}` });
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.5 });
-        hands.onResults(onResults);
+        if (videoEl.readyState < 2) {
+            requestAnimationFrame(() => {
+                processVideoFrame().catch((error) => {
+                    console.error('Could not process hand tracking frame.', error);
+                    stopTracking();
+                });
+            });
+            return;
+        }
 
-        const cam = new Camera(videoEl, {
-            onFrame: async () => { await hands.send({ image: videoEl }); },
-            width: 320, height: 240
-        });
+        if (isProcessingFrame) {
+            requestAnimationFrame(() => {
+                processVideoFrame().catch((error) => {
+                    console.error('Could not process hand tracking frame.', error);
+                    stopTracking();
+                });
+            });
+            return;
+        }
 
-        cam.start().then(() => setStatus('ready')).catch(() => setStatus('off'));
+        isProcessingFrame = true;
+
+        try {
+            await hands.send({ image: videoEl });
+        } finally {
+            isProcessingFrame = false;
+        }
+
+        if (trackingEnabled) {
+            requestAnimationFrame(() => {
+                processVideoFrame().catch((error) => {
+                    console.error('Could not process hand tracking frame.', error);
+                    stopTracking();
+                });
+            });
+        }
     }
 
-    init();
+    function stopTracking() {
+        trackingEnabled = false;
+        setToggleState(false);
+        resetPinchState();
+
+        if (mediaStream) {
+            mediaStream.getTracks().forEach((track) => track.stop());
+            mediaStream = null;
+        }
+
+        videoEl.pause();
+        videoEl.srcObject = null;
+        setStatus('off');
+    }
+
+    async function startTracking() {
+        if (trackingEnabled) {
+            return;
+        }
+
+        setStatus('requesting');
+
+        try {
+            await ensureHands();
+            mediaStream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 320 },
+                    height: { ideal: 240 },
+                    facingMode: 'user'
+                },
+                audio: false
+            });
+
+            videoEl.srcObject = mediaStream;
+            await videoEl.play();
+
+            trackingEnabled = true;
+            setToggleState(true);
+            setStatus('ready');
+            processVideoFrame().catch((error) => {
+                console.error('Could not start hand tracking.', error);
+                stopTracking();
+            });
+        } catch (error) {
+            console.error('Could not start hand tracking.', error);
+            stopTracking();
+        }
+    }
+
+    toggle.addEventListener('click', function () {
+        if (trackingEnabled) {
+            stopTracking();
+            return;
+        }
+
+        startTracking();
+    });
+
+    setToggleState(false);
+    setStatus('off');
 })();
 </script>
 
